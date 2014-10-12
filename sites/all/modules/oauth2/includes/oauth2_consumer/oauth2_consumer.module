@@ -1,0 +1,261 @@
+<?php
+
+/**
+ * @file
+ * OAuth2.0 Consumer Support module, extend OAuth2.0 Server Identifer with
+ * consumer support.
+ */
+
+/**
+ * Implements hook_entity_info().
+ */
+
+function oauth2_consumer_entity_info() {
+  return array(
+      'oauth2_consumer' => array(
+          'label' => t('OAuth2.0 Consumer'),
+          'base table' => 'oauth2_consumer',
+          'fieldable' => FALSE,
+          'entity keys' => array(
+              'id' => 'server_id',
+          ),
+          'view modes' => array(
+              'full' => array(
+                  'label' => t('Consumers'),
+                  'custom settings' => FALSE,
+              ),
+          ),
+      ),
+  );
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ */
+function oauth2_consumer_form_oauth2_server_edit_form_alter(&$form, &$form_state, $form_id) {
+
+  if (isset($form['#oauth2_server'])) {
+    $oauth2_consumer = oauth2_consumer_load($form['#oauth2_server']->server_id);
+  } else {
+    $oauth2_consumer = new StdClass(); //nothing
+  }
+
+  $form['oauth2_server']['oauth2_consumer'] = array(
+      '#type' => 'fieldset',
+      '#title' => t('Consumer settings'),
+      '#collapsible' => TRUE,
+      '#collapsed' => FALSE,
+      '#weight' => 10,
+      'fields' => array(),
+  );
+
+  $form['oauth2_server']['oauth2_consumer']['consumer_username'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Username'),
+      '#description' => t('Your registered consumer account username.'),
+      '#default_value' => isset($oauth2_consumer->username) ? $oauth2_consumer->username : '',
+      '#required' => FALSE,
+  );
+
+  // Form element with type password will not pass in with default value
+  // and so may flush existing password during form save. Here we
+  // manually preserve original password with form hidden value.
+  $form['oauth2_server']['oauth2_consumer']['consumer_password'] = array(
+      '#type' => 'password',
+      '#title' => t('Password'),
+      '#description' => t('Your registered consumer account password. NOTE: This will store as plain text in database.'),
+      '#required' => FALSE,
+  );
+  $form['password_orig'] = array(
+      '#type' => 'hidden',
+      '#value' => isset($oauth2_consumer->password) ? $oauth2_consumer->password : '',
+  );
+
+  $form['oauth2_server']['oauth2_consumer']['expires_in'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Cache lifetime (in seconds)'),
+      '#description' => t('How long will OAuth2.0 cache query result within local cache. With a long cache lifetime can greatly reduce the loading of remote OAuth2.0 authorization server; by the way with a short cache lifetime can ensure the synchronize of access_token. To disable cache functionality, simply set this as 0.'),
+      '#default_value' => isset($oauth2_consumer->expires_in) ? $oauth2_consumer->expires_in : 0,
+      '#required' => TRUE,
+  );
+
+  $form['#validate'][] = 'oauth2_consumer_form_oauth2_server_edit_form_validate';
+  $form['#submit'][] = 'oauth2_consumer_form_oauth2_server_edit_form_submit';
+
+}
+/**
+ * validate oauth2_consumer_form_oauth2_server_edit_form_alter
+ */
+function oauth2_consumer_form_oauth2_server_edit_form_validate(&$form, &$form_state) {
+
+}
+/**
+ * submit oauth2_consumer_form_oauth2_server_edit_form_alter
+ */
+function oauth2_consumer_form_oauth2_server_edit_form_submit(&$form, &$form_state) {
+  // Reuse original password if no new password.
+  if (empty($form_state['values']['consumer_password'])) {
+    $form_state['values']['consumer_password'] =  $form_state['values']['password_orig'];
+  }
+
+  $consumer = array(
+      'username'       => $form_state['values']['consumer_username'],
+      'password'       => $form_state['values']['consumer_password'],
+      'expires_in'     => $form_state['values']['expires_in'],
+  );
+  if ($form_state['values']['server_id'] != NULL) {
+    $consumer['server_id'] = $form_state['values']['server_id'];
+  }
+  oauth2_consumer_update($consumer);
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ */
+function oauth2_consumer_form_oauth2_server_delete_form_alter(&$form, &$form_state) {
+  $form['#submit'][] = 'oauth2_consumer_form_oauth2_server_delete_form_submit';
+}
+
+/**
+ * form delete
+ */
+function oauth2_consumer_form_oauth2_server_delete_form_submit(&$form, &$form_state) {
+  oauth2_consumer_delete($form_state['values']['server_id']);
+}
+
+/**
+ * Update/Add a record
+ */
+function oauth2_consumer_update($consumer) {
+
+  // We pack username and password as it may be SQL reservered words.
+  $consumer['data'] = serialize(array(
+      'username' => $consumer['username'],
+      'password' => $consumer['password'],
+  ));
+  unset($consumer['username']);
+  unset($consumer['password']);
+  if (!isset($consumer['server_id'])) {
+    //Should not be here
+    error_log('server_id not set!');
+  } else {
+    db_merge('oauth2_consumer')
+    ->key(array('server_id' => $consumer['server_id']))
+    ->fields($consumer)
+    ->execute();
+    //drupal_write_record('oauth2_consumer', $consumer, 'server_id');
+    return $consumer['server_id'];
+
+  }
+  return NULL;
+}
+
+/**
+ * Delete a record
+ */
+function oauth2_consumer_delete($server_id) {
+
+  db_query("DELETE FROM {oauth2_consumer} WHERE server_id = :s", array(':s' => $server_id));
+}
+
+/**
+ * Load a record
+ */
+function oauth2_consumer_load($server_id) {
+  ctools_include('export');
+  $result = ctools_export_load_object('oauth2_consumer', 'names', array($server_id));
+
+  if (isset($result[$server_id])) {
+    $return = drupal_unpack($result[$server_id]);
+
+    return $return;
+  }
+
+}
+/**
+ * Load multiple
+ */
+function oauth2_consumer_load_multiple($server_ids = NULL) {
+  ctools_include('export');
+  if ($server_ids === NULL) {
+    $results = ctools_export_load_object('oauth2_consumer');
+  } else {
+    $results = ctools_export_load_object('oauth2_consumer', 'names', $server_ids);
+  }
+  $consumers = array_filter($results);
+  foreach ($consumers as &$consumer) {
+    // Remember to unpack username and password.
+    $consumer = drupal_unpack($consumer);
+  }
+  unset($consumer);
+  return $consumers;
+}
+/**
+ * Useless. view not implemented for now
+ */
+/*function oauth2_consumer_view($node, $teaser = FALSE, $page = FALSE) {
+ if ($node->type == 'oauth2_server') {
+$node = node_prepare($node, $teaser);
+
+$node->content['username'] = array(
+    '#value' => theme('oauth2_consumer_username', $node->username),
+    '#weight' => 10,
+);
+$node->content['expires_in'] = array(
+    '#value' => theme('oauth2_consumer_expires_in', $node->expires_in),
+    '#weight' => 12,
+);
+
+return $node;
+}
+}*/
+
+/**
+ * Implements hook_theme().
+ */
+function oauth2_consumer_theme() {
+  return array(
+      'oauth2_consumer_username' => array(
+          'arguments' => array('username' => '', 'teaser' => 0, 'page' => 0),
+      ),
+      'oauth2_consumer_expires_in' => array(
+          'arguments' => array('expires_in' => '', 'teaser' => 0, 'page' => 0),
+      ),
+  );
+}
+
+/**
+ * Returns HTML for field username.
+ *
+ * @ingroup themeable
+ */
+/*function theme_oauth2_consumer_username($username, $teaser = 0, $page = 0) {
+ $output = '<div class="oauth2_consumer-info username">';
+$output .= t('Username: @username', array('@username' => $username));
+$output .= '</div>';
+return $output;
+}*/
+
+/**
+ * Returns HTML for field service_uri.
+ *
+ * @ingroup themeable
+ */
+/*function theme_oauth2_consumer_services_uri($services_uri, $teaser = 0, $page = 0) {
+ $output = '<div class="oauth2_consumer-info services_uri">';
+$output .= t('Services endpoint: @services_uri', array('@services_uri' => $services_uri));
+$output .= '</div>';
+return $output;
+}*/
+
+/**
+ * Returns HTML for field expires_in.
+ *
+ * @ingroup themeable
+ */
+/*function theme_oauth2_consumer_expires_in($expires_in, $teaser = 0, $page = 0) {
+ $output = '<div class="oauth2_consumer-info expires_in">';
+$output .= t('Cache lifetime (in seconds): @expires_in', array('@expires_in' => $expires_in));
+$output .= '</div>';
+return $output;
+}*/

@@ -1,0 +1,56 @@
+<?php
+
+/**
+ * @file
+ * Simpletest case for oauth2 module.
+ *
+ * Verify oauth2 module functionality.
+ */
+
+/**
+ * Functionality tests for oauth2 module.
+ */
+class OAuth2TestCase extends DrupalWebTestCase {
+  protected $admin_user;
+
+  public static function getInfo() {
+    return array(
+      'name' => 'OAuth2.0 Core',
+      'description' => 'Verify the oauth2-php library linkage and default setup, etc.',
+      'group' => 'OAuth2.0',
+    );
+  }
+
+  function setUp() {
+    // Enable the module.
+    parent::setUp('ctools', 'oauth2', 'oauth2_client', 'oauth2_server', 'oauth2_scope');
+    $this->admin_user = $this->drupalCreateUser(array('administer site configuration', 'administer nodes', 'create oauth2_client', 'create oauth2_server', 'create oauth2_scope', 'access content'));
+  }
+
+  /**
+   * Tests oauth2 overview.
+   */
+  function testAdminPage() {
+    $this->drupalLogin($this->admin_user);
+
+    // Verify both standalone and proxy mode setup are exist.
+    $this->drupalGet('admin/build/oauth2');
+    $this->assertResponse(200);
+    $this->assertRaw(t('oauth2-php library path'));
+    $this->assertRaw(t('Standalone mode'));
+    $this->assertRaw(t('Proxy mode'));
+    $this->assertRaw(t("<p>To use proxy mode you should first define at least one <a href='@oauth2_server'>OAuth2.0 server indentifier</a> and <a href='@admin'>publish it</a>.</p>", array(
+      '@oauth2_server' => url('node/oauth2_server/add'),
+      '@admin' => url('admin/build/oauth2/oauth2_server'),
+    )));
+
+    // Create a sample oauth2_server and recheck the admin UI.
+    $nodes['oauth2_server_1'] = $this->drupalCreateNode(array('type' => 'oauth2_server', 'base_uri' => 'http://example1.com/', 'server_id' => 'example1'));
+    $nodes['oauth2_server_2'] = $this->drupalCreateNode(array('type' => 'oauth2_server', 'base_uri' => 'http://example2.com/', 'server_id' => 'example2'));
+    $this->drupalGet('admin/build/oauth2');
+    $this->assertRaw(t('OAuth2.0 authorization server indentifier'));
+    foreach ($nodes as $node) {
+      $this->assertRaw("{$node->title} ({$node->server_id})");
+    }
+  }
+}

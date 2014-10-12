@@ -1,0 +1,8 @@
+name = exporter export module
+description = Export objects from CTools
+dependencies[] = file_entity
+dependencies[] = views
+dependencies[] = page_manager
+package = Chaos tool suite
+core = 7.x
+

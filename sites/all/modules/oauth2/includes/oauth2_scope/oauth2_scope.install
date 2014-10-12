@@ -1,0 +1,83 @@
+<?php
+
+/**
+ * @file
+ * OAuth2.0 schema file.
+ */
+
+
+
+function oauth2_scope_schema() {
+  $schema = array();
+
+  $schema['oauth2_scope'] = array(
+      'description' => t('OAuth2.0 scope information as Drupal entity.'),
+      'export' => array(
+          'key' => 'scope_id',
+          'key name' => 'OAuth2.0 Scope Machine Name',
+          'primary key' => 'sid',
+          'identifier' => 'preset', // Exports will be defined as $preset
+          'default hook' => 'default_oauth2_scope_preset',  // Function hook name.
+          'api' => array(
+              'owner' => 'oauth2_scope',
+              'api' => 'default_oauth2_scope_presets',  // Base name for api include files.
+              'minimum_version' => 1,
+              'current_version' => 1,
+          ),
+      ),
+      'fields' => array(
+          'sid' => array(
+              'description' => 'The primary identifier for an entity.',
+              'type' => 'serial',
+              'unsigned' => TRUE,
+              'not null' => TRUE,
+          ),
+          'scope_id' => array(
+              'description' => t('The scope identifier.'),
+              'type' => 'varchar',
+              'length' => 64,
+              'not null' => TRUE,
+          ),
+          'hidden' => array(
+              'description' => 'Boolean indicating whether this scope should include within default empty scope value.',
+              'type' => 'int',
+              'not null' => TRUE,
+              'default' => 0,
+          ),
+          'bypass' => array(
+              'description' => 'Boolean indicating whether this scope should bypass end-user authorization.',
+              'type' => 'int',
+              'not null' => TRUE,
+              'default' => 0,
+          ),
+          'required' => array(
+              'description' => 'Boolean indicating whether this scope can remove by end-user manually once authorizated for this application.',
+              'type' => 'int',
+              'not null' => TRUE,
+              'default' => 0,
+          ),
+          'status' => array(
+              'type' => 'int',
+              'unsigned' => TRUE,
+              'not null' => TRUE,
+              'default' => 1,
+              'size' => 'tiny',
+              'description' => 'status',
+          ),
+          'changed' => array(
+              'type' => 'int',
+              'unsigned' => TRUE,
+              'not null' => TRUE,
+              'default' => 1,
+              'size' => 'tiny',
+              'description' => 'changed',
+          ),
+      ),
+      'indexes' => array(
+          'scope_id' => array('scope_id'),
+      ),
+      'primary key' => array('sid'),
+  );
+
+  return $schema;
+}

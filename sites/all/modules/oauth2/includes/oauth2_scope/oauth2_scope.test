@@ -1,0 +1,70 @@
+<?php
+
+/**
+ * @file
+ * Simpletest case for oauth2_scope module.
+ *
+ * Verify oauth2_scope module functionality.
+ */
+
+/**
+ * Functionality tests for oauth2_scope module.
+ */
+class OAuth2ScopeTestCase extends DrupalWebTestCase {
+  protected $admin_user;
+
+  public static function getInfo() {
+    return array(
+        'name' => 'OAuth2.0 Scope Identifer',
+        'description' => 'Verify the oauth2_scope node type creation and admin overview.',
+        'group' => 'OAuth2.0',
+    );
+  }
+
+  function setUp() {
+    // Enable the module.
+    parent::setUp('oauth2_scope');
+    $this->admin_user = $this->drupalCreateUser(array('administer site configuration', 'administer nodes', 'create oauth2_scope', 'access content'));
+  }
+
+  /**
+   * Verify the functionality of the oauth2_client module.
+   */
+  function testNodeCreation() {
+    $this->drupalLogin($this->admin_user);
+
+    // Create a new node.
+    $edit = array(
+        'title' => $this->randomName(),
+        'scope_id' => $this->randomName(),
+        'hidden' => 1,
+        'bypass' => 1,
+        'required' => 1,
+    );
+    $this->drupalPost('node/add/oauth2-scope', $edit, t('Save'));
+    $this->assertText(t("OAuth2.0 Scope Identifer @title has been created", array('@title' => $edit['title'])));
+    $this->assertText(t('Scope ID: @scope_id', array('@scope_id' => $edit['scope_id'])));
+    $this->assertText(t('Hidden scope: @hidden', array('@hidden' => 'TRUE')));
+    $this->assertText(t('Bypass end-user authorization: @bypass', array('@bypass' => 'TRUE')));
+    $this->assertText(t('Required scope: @required', array('@required' => 'TRUE')));
+  }
+
+  /**
+   * Tests oauth2_scope overview.
+   */
+  function testNodeAdminPages() {
+    $this->drupalLogin($this->admin_user);
+
+    $nodes['oauth2_scope_1'] = $this->drupalCreateNode(array('type' => 'oauth2_scope', 'scope_id' => $this->randomName()));
+    $nodes['oauth2_scope_2'] = $this->drupalCreateNode(array('type' => 'oauth2_scope', 'scope_id' => $this->randomName()));
+
+    // Verify view, edit, and delete links for any content.
+    $this->drupalGet('admin/build/oauth2/oauth2_scope');
+    $this->assertResponse(200);
+    foreach ($nodes as $node) {
+      $this->assertRaw('<a href="'. url('node/'. $node->nid) .'">');
+      $this->assertRaw('<a href="'. url('node/'. $node->nid .'/edit', array('query' => array('destination' => 'admin/build/oauth2/oauth2_scope'))) .'">');
+      $this->assertRaw('<a href="'. url('node/'. $node->nid .'/delete', array('query' => array('destination' => 'admin/build/oauth2/oauth2_scope'))) .'">');
+    }
+  }
+}

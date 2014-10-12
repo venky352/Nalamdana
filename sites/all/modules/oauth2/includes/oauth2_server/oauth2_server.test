@@ -1,0 +1,78 @@
+<?php
+
+/**
+ * @file
+ * Simpletest case for oauth2_server module.
+ *
+ * Not yet convert to D7
+ *
+ * Verify oauth2_server module functionality.
+ */
+
+/**
+ * Functionality tests for oauth2_server module.
+ */
+class OAuth2ServerTestCase extends DrupalWebTestCase {
+  protected $admin_user;
+
+  public static function getInfo() {
+    return array(
+        'name' => 'OAuth2.0 Server Identifer',
+        'description' => 'Verify the oauth2_server entity creation and admin overview.',
+        'group' => 'OAuth2.0',
+    );
+  }
+
+  function setUp() {
+    // Enable the module.
+    parent::setUp('oauth2_server');
+    $this->admin_user = $this->drupalCreateUser(array('administer site configuration', 'delete own oauth2_server', 'create oauth2_server', 'edit own oauth2_server'));
+  }
+
+  /**
+   * Verify the functionality of the oauth2_client module.
+   */
+  function testNodeCreation() {
+    $this->drupalLogin($this->admin_user);
+
+    // Create a new entity.
+    $edit = array(
+        'title' => $this->randomName(),
+        'server_id' => $this->randomName(),
+        'base_uri' => 'http://example.com/',
+        'client_id' => md5(base64_encode(pack('N6', mt_rand(), mt_rand(), mt_rand(), mt_rand(), mt_rand(), uniqid()))),
+        'client_secret' => md5(base64_encode(pack('N6', mt_rand(), mt_rand(), mt_rand(), mt_rand(), mt_rand(), uniqid()))),
+        'authorize_uri' => 'oauth2/authorize',
+        'access_token_uri' => 'oauth2/access_token',
+    );
+    $this->drupalPost('oauth2-server/add', $edit, t('Save'));
+    $this->assertText(t("OAuth2.0 Server Identifer @title has been created", array('@title' => $edit['title'])));
+    $this->assertText(t('Server ID: @server_id', array('@server_id' => $edit['server_id'])));
+    $this->assertText(t('Base URI: @base_uri', array('@base_uri' => $edit['base_uri'])));
+    $this->assertText(t('Application ID: @client_id', array('@client_id' => $edit['client_id'])));
+    $this->assertText(t('Application Secret: @client_secret', array('@client_secret' => $edit['client_secret'])));
+    $this->assertText(t('End-user authorization endpoint: @authorize_uri', array('@authorize_uri' => $edit['authorize_uri'])));
+    $this->assertText(t('Token endpoint: @access_token_uri', array('@access_token_uri' => $edit['access_token_uri'])));
+  }
+
+  /**
+   * Tests oauth2_server overview.
+   */
+  function testNodeAdminPages() {
+    $this->drupalLogin($this->admin_user);
+
+    $servers = array();
+    $servers[] =
+    $nodes['oauth2_server_1'] = $this->drupalCreateNode(array('type' => 'oauth2_server', 'base_uri' => 'http://example1.com/', 'server_id' => 'example1'));
+    $nodes['oauth2_server_2'] = $this->drupalCreateNode(array('type' => 'oauth2_server', 'base_uri' => 'http://example2.com/', 'server_id' => 'example2'));
+
+    // Verify view, edit, and delete links for any content.
+    $this->drupalGet('admin/structure/oauth2/oauth2-server');
+    $this->assertResponse(200);
+    foreach ($nodes as $node) {
+      $this->assertRaw('<a href="'. url('node/'. $node->nid) .'">');
+      $this->assertRaw('<a href="'. url('node/'. $node->nid .'/edit', array('query' => array('destination' => 'admin/build/oauth2/oauth2_server'))) .'">');
+      $this->assertRaw('<a href="'. url('node/'. $node->nid .'/delete', array('query' => array('destination' => 'admin/build/oauth2/oauth2_server'))) .'">');
+    }
+  }
+}

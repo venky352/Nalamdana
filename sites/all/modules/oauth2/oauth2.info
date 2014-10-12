@@ -1,0 +1,17 @@
+name = "OAuth2.0 Core"
+description = "Provides oauth2-php library linkage and default setup, etc."
+package = "OAuth2.0"
+dependencies[] = ctools
+core = 7.x
+
+files[] = includes/DrupalOAuth2.inc
+files[] = includes/DrupalOAuth2Client.inc
+files[] = includes/DrupalOAuth2Proxy.inc
+
+files[] = oauth2.test
+; Information added by drupal.org packaging script on 2013-10-01
+version = "7.x-1.0-alpha1+5-dev"
+core = "7.x"
+project = "oauth2"
+datestamp = "1380595030"
+

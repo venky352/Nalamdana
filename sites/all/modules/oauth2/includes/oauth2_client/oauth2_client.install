@@ -1,0 +1,87 @@
+<?php
+
+/**
+ * @file
+ * OAuth2.0 Client Identifer install and uninstall code.
+ */
+
+
+/**
+ * Implements hook_schema().
+ */
+function oauth2_client_schema() {
+  $schema = array();
+  $schema['oauth2_client'] = array(
+      'description' => t('OAuth2.0 client indentifier information as a Drupal Entity.'),
+      'export' => array(
+          'key' => 'client_id',
+          'key name' => 'OAuth2.0 Client Machine Name',
+          'primary key' => 'cid',
+          'identifier' => 'preset', // Exports will be defined as $preset
+          'default hook' => 'default_oauth2_client_preset',  // Function hook name.
+          'api' => array(
+              'owner' => 'oauth2_server',
+              'api' => 'default_oauth2_client_presets',  // Base name for api include files.
+              'minimum_version' => 1,
+              'current_version' => 1,
+          ),
+      ),
+      'fields' => array(
+          'cid' => array(
+              'description' => 'The primary identifier for a client.',
+              'type' => 'serial',
+              'unsigned' => TRUE,
+              'not null' => TRUE,
+              'no export' => TRUE,
+          ),
+          'title' => array(
+              'description' => t('title.'),
+              'type' => 'varchar',
+              'length' => 64,
+              'not null' => TRUE,
+          ),
+          'client_id' => array(
+              'description' => t('The client identifier.'),
+              'type' => 'varchar',
+              'length' => 64,
+              'not null' => TRUE,
+          ),
+          'client_secret' => array(
+              'description' => t('The client password.'),
+              'type' => 'varchar',
+              'length' => 255,
+              'not null' => TRUE,
+          ),
+          'redirect_uri' => array(
+              'description' => t('An absolute URI to which the authorization server will redirect the user-agent to when the end-user authorization step is completed.'),
+              'type' => 'text',
+          ),
+          'base_domain' => array(
+              'description' => t('If set, Drupal will enable authentication on all subdomains (e.g., "example.com" will enable *.example.com).'),
+              'type' => 'text',
+          ),
+          'status' => array(
+              'type' => 'int',
+              'unsigned' => TRUE,
+              'not null' => TRUE,
+              'default' => 1,
+              'size' => 'tiny',
+              'description' => 'status',
+          ),
+          'changed' => array(
+              'type' => 'int',
+              'unsigned' => TRUE,
+              'not null' => TRUE,
+              'default' => 1,
+              'size' => 'tiny',
+              'description' => 'changed',
+          ),
+      ),
+      'primary key' => array('cid'),
+      'unique keys' => array(
+          'server_id' => array('client_id'),
+      ),
+  );
+
+  return $schema;
+}

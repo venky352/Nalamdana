@@ -1,0 +1,273 @@
+<?php
+
+/**
+ * @file
+ * OAuth2.0 Provider Support module, provides functionality for OAuth2.0
+ * when acting as a provider.
+ */
+
+/**
+ * Implements hook_init().
+ */
+function oauth2_provider_init() {
+  // The initialize of class will handle the hack of user base on
+  // $_REQUEST['oauth_token'].
+  if (variable_get('oauth2_provider_mode', OAUTH2_DEFAULT_PROVIDER_MODE) != 'DrupalOAuth2Client') {
+    $server = oauth2_get_server();
+  }
+}
+
+/**
+ * Implements hook_menu().
+ */
+function oauth2_provider_menu() {
+  $items = array();
+
+  // End-user authorization endpoint for both code and token.
+  $items['oauth2/authorize'] = array(
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('oauth2_provider_authorize_form'),
+      'access callback' => TRUE,
+      'file' => 'oauth2_provider.pages.inc',
+      'type' => MENU_CALLBACK,
+  );
+
+  // Token endpoint for both authorizaion code, password and refresh token.
+  $items['oauth2/access_token'] = array(
+      'page callback' => 'oauth2_provider_access_token_callback',
+      'access callback' => TRUE,
+      'file' => 'oauth2_provider.pages.inc',
+      'type' => MENU_CALLBACK,
+  );
+
+  return $items;
+}
+
+/**
+ * Implements hook_menu_alter().
+ */
+function oauth2_provider_menu_alter(&$callbacks) {
+  // Replace the login and logout menu callback.
+
+  $callbacks['user']['page callback'] = 'oauth2_provider_page';
+  $callbacks['logout']['page callback'] = 'oauth2_provider_logout';
+}
+
+/**
+ * Implements hook_form_alter().
+ *
+ *  Cannot use hook_form_FORM_ID_alter because login block and /user have different form_id
+ */
+function oauth2_provider_form_alter(&$form, &$form_state, $form_id) {
+
+  if ($form_id != 'user_login_block' && $form_id != 'user_login') {
+    return;
+  }
+
+  if (isset($form['#submit']) && is_array($form['#submit']) && ($key = array_search('user_login_submit', $form['#submit'])) !== FALSE) {
+    $form['#submit'][$key] = 'oauth2_provider_login_submit';
+    // Replace the submit handler of login form.
+  }
+
+  $server_id = variable_get('oauth2_proxy_server_identifier');
+  if (variable_get('oauth2_provider_mode', OAUTH2_DEFAULT_PROVIDER_MODE) == 'DrupalOAuth2Proxy' && isset($server_id)) {
+    //only for proxy mode
+
+    $oauth2_server = oauth2_server_load($server_id);
+    if ($form_id == 'user_login_block') {
+      $form['#action'] = '/?destination=user&response_type=code&client_id='.$oauth2_server->client_id.'&redirect_uri=user';
+    } else {
+      $form['#action'] = '/user?destination=user&response_type=code&client_id='.$oauth2_server->client_id.'&redirect_uri=user';
+    }
+    
+
+
+    // Replace the drupal authenticate function is it's used as validation.
+    if (variable_get('oauth2_provider_mode', OAUTH2_DEFAULT_PROVIDER_MODE) == 'DrupalOAuth2Proxy'
+    && isset($form['#validate'])
+    && is_array($form['#validate'])
+    && ($key = array_search('user_login_authenticate_validate', $form['#validate']))) {
+      $form['#validate'][$key] = 'oauth2_provider_login_authenticate_validate';
+    }
+
+  }
+
+}
+
+
+/**
+ * Implements hook_cron().
+ */
+function oauth2_provider_cron() {
+  if (variable_get('oauth2_provider_mode', OAUTH2_DEFAULT_PROVIDER_MODE) == 'DrupalOAuth2') {
+    // Clear legacy tokens.
+    db_query("DELETE FROM {oauth2_access_tokens} WHERE expires < :time",array(':time' => time()));
+    db_query("DELETE FROM {oauth2_auth_codes} WHERE expires < :time", array(':time' => time()));
+    db_query("DELETE FROM {oauth2_refresh_tokens} WHERE expires < :time", array(':time' => time()));
+  }
+}
+
+/**
+ * Access callback for path /user.
+ *
+ * Displays user profile if user is logged in, or login form for anonymous
+ * users.
+ */
+function oauth2_provider_page() {
+  global $user;
+  if ($user->uid) {
+    // Redirect user to oauth2/authorize if from OAuth2.0 request pattern.
+    if (isset($_GET['response_type']) && isset($_GET['client_id']) && isset($_GET['redirect_uri'])) {
+      menu_set_active_item('oauth2/authorize');
+      return menu_execute_active_handler(NULL, FALSE);
+    }
+    else {
+      menu_set_active_item('user/'. $user->uid);
+      return menu_execute_active_handler(NULL, FALSE);
+    }
+  }
+  else {
+    return drupal_get_form('user_login');
+  }
+}
+
+/**
+ * Submit handler for the login form. Redirects the user to a page.
+ *
+ * The user is redirected to the My Account page. Setting the destination in
+ * the query string (as done by the user login block) overrides the redirect.
+ */
+function oauth2_provider_login_submit($form, &$form_state) {
+  global $user;
+  //error_log(__FUNCTION__);
+  // Redirect user to oauth2/authorize if from OAuth2.0 request pattern.
+  if (isset($_GET['response_type']) && isset($_GET['client_id']) && isset($_GET['redirect_uri'])) {
+
+    $user = user_load($form_state['uid']);
+    $query = array('query' => $_GET);
+    unset($query['query']['q']);
+    $form_state['redirect'] = array('oauth2/authorize', $query);
+
+  } else {
+    
+    $user = user_load($form_state['uid']);
+    $form_state['redirect'] = 'user/'. $user->uid;
+  }
+  user_login_finalize($form_state);
+}
+
+/**
+ * A validate handler on the login form. Check supplied username/password
+ * against local users table. If successful, sets the global $user object.
+ */
+function oauth2_provider_login_authenticate_validate($form, &$form_state) {
+  $root_user = user_load(1);
+//error_log(__FUNCTION__);
+
+
+  if (!isset($_GET['response_type'],$_GET['client_id'],$_GET['redirect_uri']) || trim($form_state['values']['name']) == $root_user->name) {
+    user_login_authenticate_validate($form,$form_state);
+  } else {
+
+    $result = oauth2_get_server()->checkUserCredentials($_GET['client_id'], $form_state['values']['name'], $form_state['values']['pass']);
+    //error_log(print_r($result,true));
+    //$result: array( 'uid' => <id>, 'name' => <username>, 'sid' => <session_id>, 'scope' => <scope> );
+    if ($result && !empty($result['name'])) {
+      $name = $result['name'];
+      
+      $user = user_external_load($name);
+      if (!$user) {
+        //try to load user from existing user table
+        $user = user_load_by_name($name);
+      
+        if ($user !== FALSE) {
+          //if user exist
+          user_set_authmaps($user, array("authname_oauth2" => $name));
+          
+        } else {
+          //create the user
+          $userinfo = array(
+              'name' => $name,
+              'pass' => user_password(),
+              'init' => $name,
+              'status' => 1,
+              'access' => REQUEST_TIME
+          );
+          $user = user_save(drupal_anonymous_user(), $userinfo);
+          // Terminate if an error occurred during user_save().
+          if (!$user) {
+            drupal_set_message(t("Error saving user account."), 'error');
+            return;
+          }
+          user_set_authmaps($user, array("authname_oauth2" => $name));
+        }
+      } else {
+        
+      
+      }
+      
+      if (isset($user->uid)) {
+
+      //we need the uid in THIS drupal 
+        $form_state['uid'] = $user->uid;
+      }
+    }
+    else {
+      watchdog('oauth2_provider', 'Login attempt failed for %user.', array('%user' => $form_state['values']['name']));
+    }
+  }
+}
+
+/**
+ * Menu callback; logs the current user out, and redirects to the home page.
+ */
+function oauth2_provider_logout() {
+  global $user;
+
+  watchdog('oauth2_provider', 'Session closed for %name.', array('%name' => $user->name));
+
+  module_invoke_all('user_logout', $user);
+  // Destroy the current session and reset $user to the anonymous user.
+  session_destroy();
+
+  // There is no standard for expirse access token from remote site, so we
+  // do a custom management here. If access /logout with POST plus
+  // oauth_token, we will just echo a TRUE to client.
+  if (isset($_POST['oauth_token'])) {
+    echo TRUE;
+    exit;
+  }
+  // On the other hand, if access /logout with GET plus oauth_token and
+  // redirect_uri, assume it is a browser access and so redirect back to
+  // URL provided.
+  elseif (isset($_GET['oauth_token']) && isset($_GET['redirect_uri'])) {
+    drupal_goto($_GET['redirect_uri']);
+  }
+  // Finally, a by default redirect to frontpage.
+  else {
+    drupal_goto();
+  }
+}
+
+/**
+ * Implements hook_theme().
+ */
+// function oauth2_provider_theme() {
+//   return array(
+//       'oauth2_provider_scope' => array(
+//           'arguments' => array('node' => '', 'teaser' => 0, 'page' => 0),
+//       ),
+//   );
+// }
+
+/**
+ * Returns HTML for scope items.
+ *
+ * @ingroup themeable
+ */
+function theme_oauth2_provider_scope($node, $teaser = 0, $page = 0) {
+  $output = '<div class="oauth2_provider-info node">';
+  $output .= node_view($node, TRUE);
+  $output .= '</div>';
+  return $output;
+}

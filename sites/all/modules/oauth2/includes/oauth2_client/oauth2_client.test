@@ -1,0 +1,66 @@
+<?php
+
+/**
+ * @file
+ * Simpletest case for oauth2_client module.
+ *
+ * Verify oauth2_client module functionality.
+ */
+
+/**
+ * Functionality tests for oauth2_client module.
+ */
+class OAuth2ClientTestCase extends DrupalWebTestCase {
+  protected $admin_user;
+
+  public static function getInfo() {
+    return array(
+        'name' => 'OAuth2.0 Client Identifer',
+        'description' => 'Verify the oauth2_client node type creation and admin overview.',
+        'group' => 'OAuth2.0',
+    );
+  }
+
+  function setUp() {
+    // Enable the module.
+    parent::setUp('oauth2_client');
+    $this->admin_user = $this->drupalCreateUser(array('administer site configuration', 'administer nodes', 'create oauth2_client', 'access content'));
+  }
+
+  /**
+   * Verify the functionality of the oauth2_client module.
+   */
+  function testNodeCreation() {
+    $this->drupalLogin($this->admin_user);
+
+    // Create a new node.
+    $edit = array(
+        'title' => $this->randomName(),
+        'redirect_uri' => 'http://example.com/',
+        'base_domain' => 'example.com',
+    );
+    $this->drupalPost('node/add/oauth2-client', $edit, t('Save'));
+    $this->assertText(t("OAuth2.0 Client Identifer @title has been created", array('@title' => $edit['title'])));
+    $this->assertText(t('Site URL: @redirect_uri', array('@redirect_uri' => $edit['redirect_uri'])));
+    $this->assertText(t('Site Domain: @base_domain', array('@base_domain' => $edit['base_domain'])));
+  }
+
+  /**
+   * Tests oauth2_client overview.
+   */
+  function testNodeAdminPages() {
+    $this->drupalLogin($this->admin_user);
+
+    $nodes['oauth2_client_1'] = $this->drupalCreateNode(array('type' => 'oauth2_client', 'redirect_uri' => 'http://example1.com/', 'base_domain' => 'example1.com'));
+    $nodes['oauth2_client_2'] = $this->drupalCreateNode(array('type' => 'oauth2_client', 'redirect_uri' => 'http://example2.com/', 'base_domain' => 'example2.com'));
+
+    // Verify view, edit, and delete links for any content.
+    $this->drupalGet('admin/build/oauth2/oauth2_client');
+    $this->assertResponse(200);
+    foreach ($nodes as $node) {
+      $this->assertRaw('<a href="'. url('node/'. $node->nid) .'">');
+      $this->assertRaw('<a href="'. url('node/'. $node->nid .'/edit', array('query' => array('destination' => 'admin/build/oauth2/oauth2_client'))) .'">');
+      $this->assertRaw('<a href="'. url('node/'. $node->nid .'/delete', array('query' => array('destination' => 'admin/build/oauth2/oauth2_client'))) .'">');
+    }
+  }
+}

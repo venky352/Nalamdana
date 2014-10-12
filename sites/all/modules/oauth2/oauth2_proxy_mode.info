@@ -1,0 +1,14 @@
+name = "OAuth2.0 Proxy Mode Dummy Package"
+description = "Provides OAuth2.0 Proxy Mode functionality"
+package = "OAuth2.0 - dummy"
+dependencies[] = oauth2
+dependencies[] = oauth2_server
+dependencies[] = oauth2_provider
+dependencies[] = oauth2_consumer
+core = 7.x
+; Information added by drupal.org packaging script on 2013-10-01
+version = "7.x-1.0-alpha1+5-dev"
+core = "7.x"
+project = "oauth2"
+datestamp = "1380595030"
+

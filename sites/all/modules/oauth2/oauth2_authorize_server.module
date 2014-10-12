@@ -1,0 +1,6 @@
+<?php
+
+/**
+ * @file
+ * Dummy package for enabling OAuth2.0 authorization server functionality.
+ */

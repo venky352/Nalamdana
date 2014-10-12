@@ -1,0 +1,344 @@
+<?php
+
+/**
+ * @file
+ * The OAuth2.0 Client Identifer as Drupal node.
+ */
+
+/**
+ * Implements hook_help().
+ */
+function oauth2_client_help($section, $arg) {
+  switch ($section) {
+    case 'admin/structure/oauth2/oauth2-client':
+      $help = '<p>'. t("An <a href='!oauth2_client'>OAuth2.0 Client Identifer</a> contain the registed OAuth2.0 application information, including client_id, client_secret, redirect_uri and base_domain, etc.", array(
+      '!oauth2_client' => url('admin/structure/oauth2/oauth2-client/add'),
+      )) .'</p>';
+      return $help;
+  }
+}
+
+/**
+ * Implements hook_menu().
+ */
+function oauth2_client_menu() {
+  $items = array();
+
+  
+  $items['admin/structure/oauth2/oauth2-client'] = array(
+      'title' => 'Clients',
+      'description' => 'List, add, and edit OAuth2.0 Client Identifer.',
+      'page callback' => 'oauth2_client_admin_callback',
+      'access arguments' => array('administer site configuration'),
+      'file' => 'oauth2_client.admin.inc',
+      'type' => MENU_LOCAL_TASK,
+      'weight' => -8,
+  );
+
+  
+  $items['admin/structure/oauth2/oauth2-client/%oauth2_client'] = array(
+      'title' => 'View OAuth2 client Identifier',
+      'page callback' => 'oauth2_client_view_callback',
+      'page arguments' => array(4),
+      'access callback' => 'oauth2_client_access',
+      'access arguments' => array('edit',1),
+      'file' => 'oauth2_client.admin.inc',
+      //'type' => MENU_LOCAL_TASK,
+      'weight' => 0,
+  );
+
+  $items['admin/structure/oauth2/oauth2-client/add'] = array(
+      'title' => 'Add OAuth2 client Identifier',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('oauth2_client_edit_form'),
+      'access callback' => 'oauth2_client_access',
+      'access arguments' => array('create',1),
+      'file' => 'oauth2_client.admin.inc',
+      //'type' => MENU_LOCAL_TASK,
+      'weight' => 0,
+  );
+
+  $items['admin/structure/oauth2/oauth2-client/%oauth2_client/edit'] = array(
+      'title' => 'Edit OAuth2 client Identifier',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('oauth2_client_edit_form', 4),
+      'access callback' => 'oauth2_client_access',
+      'access arguments' => array('edit',1),
+      'file' => 'oauth2_client.admin.inc',
+      //'type' => MENU_LOCAL_TASK,
+      'weight' => 0,
+  );
+
+  $items['admin/structure/oauth2/oauth2-client/%oauth2_client/delete'] = array(
+      'title' => 'Delete OAuth2 client Identifier',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('oauth2_client_delete_form', 4),
+      'access callback' => 'oauth2_client_access',
+      'access arguments' => array('delete',1),
+      'file' => 'oauth2_client.admin.inc',
+      //'type' => MENU_LOCAL_TASK,
+      'weight' => 0,
+  );
+  //*/
+
+  return $items;
+}
+
+/**
+ * Implements hook_entity_info().
+ */
+
+function oauth2_client_entity_info() {
+  return array(
+      'oauth2_client' => array(
+          'label' => t('OAuth2.0 client Identifer'),
+          'base table' => 'oauth2_client',
+          'uri callback' => 'oauth2_client_uri',
+          'fieldable' => FALSE,
+          'entity keys' => array(
+              'id' => 'cid',
+          ),
+          'buddles' => array(
+              'oauth2_client' => array(
+                  'label' => 'OAuth2 Client Identifier',
+                  'admin' => array(
+                      'path' => 'admin/structure/oauth2/oauth2-client',
+                      'access arguments' =>  array('administer site configuration')
+                  )
+              )
+          ),
+          'view modes' => array(
+              'full' => array(
+                  'label' => t('Clients'),
+                  'custom settings' => FALSE,
+              ),
+          ),
+      ),
+  );
+}
+
+/**
+ * Entity uri callback
+ */
+function oauth2_client_uri($client) {
+  return array(
+      'path' => 'oauth2-client/' . $client->cid
+  );
+}
+
+/**
+ * Implements hook_permission().
+ */
+function oauth2_client_permission() {
+  return array(
+      'create oauth2_client' => array(
+          'title' => t('Create new client')
+      ),
+      'delete any oauth2_client' => array(
+          'title' => t('Delete any client')
+      ),
+      'edit any oauth2_client' => array(
+          'title' => t('Edit any client')
+      ),
+  );
+}
+
+/**
+ * @param $op
+ *   The operation that is to be performed on the client identifier.
+ * @param $client
+ *   The client identifier object.
+ * @return
+ *   TRUE if the current user has access to the client identifier, FALSE otherwise.
+ */
+function oauth2_client_access($op, $client) {
+  global $user;
+  if ($op == 'create') {
+    // Anonymous users cannot post even if they have the permission.
+    return user_access('create oauth2_client', $user) && $user->uid ? TRUE : NULL;
+  }
+
+  if ($op == 'edit') {
+    if (user_access('edit any oauth2_client', $user)) { // || (user_access('edit own oauth2_client', $user) && ($user->uid == $node->uid))) {
+      return TRUE;
+    }
+  }
+
+  if ($op == 'delete') {
+    if (user_access('delete any oauth2_client', $user)) { //) || (user_access('delete own oauth2_client', $user) && ($user->uid == $node->uid))) {
+      return TRUE;
+    }
+  }
+}
+
+/**
+ * Update/Add a record
+ */
+function oauth2_client_update($oauth2_client) {
+  if (!isset($oauth2_client['cid'])) {
+    drupal_write_record('oauth2_client', $oauth2_client);
+  } else {
+    drupal_write_record('oauth2_client', $oauth2_client, 'cid');
+  }
+  return $oauth2_client['cid'];
+}
+
+
+/**
+ * Delete a record
+ */
+function oauth2_client_delete($client_id) {
+  db_query("DELETE FROM {oauth2_client} WHERE client_id = :d", array(':d' => $client_id));
+}
+
+/**
+ * Load a record
+ */
+function oauth2_client_load($client_id) {
+//   $cids = (isset($cid) ? array($cid) : array());
+//   $oauth2_client = oauth2_client_load_multiple($cids,$reset);
+//   return $oauth2_client ? reset ($oauth2_client) : FALSE;
+
+  ctools_include('export');
+  $result = ctools_export_load_object('oauth2_client', 'names', array($client_id));
+  
+  if (isset($result[$client_id])) {
+    return $result[$client_id];
+  }
+}
+
+/**
+ * Load multiple
+ */
+function oauth2_client_load_multiple($client_ids = NULL) {
+  ctools_include('export');
+  if ($client_ids === NULL) {
+    $results = ctools_export_load_object('oauth2_client');
+  } else {
+    $results = ctools_export_load_object('oauth2_client', 'names', $client_ids);
+  }
+  return array_filter($results);
+}
+/**
+ * Load by client id
+ */
+function oauth2_client_load_by_client_id($client_id) {
+  return oauth2_client_load($client_id);
+ /*$query = new EntityFieldQuery;
+
+  $result = $query
+  ->entityCondition('entity_type', 'oauth2_client')
+  ->propertyCondition('client_id', $client_id)
+  ->execute();
+
+  if (!empty($result['oauth2_client'])) {
+    $cid = -1;
+    foreach($result['oauth2_client'] as $key => $row) {
+      $cid = $key;
+    }
+    $entities = entity_load('oauth2_client', array($cid));
+    foreach($entities as $entity) {
+      //should be unique
+      //only return the first one
+
+      return $entity;
+    }
+  }
+  
+  return NULL;*/
+}
+
+/**
+ * Implements hook_view().
+ */
+/*function oauth2_client_view($node, $teaser = FALSE, $page = FALSE) {
+ $node = node_prepare($node, $teaser);
+
+$node->content['client_id'] = array(
+    '#value' => theme('oauth2_client_client_id', $node->client_id),
+    '#weight' => -10,
+);
+$node->content['client_secret'] = array(
+    '#value' => theme('oauth2_client_client_secret', $node->client_secret),
+    '#weight' => -9,
+);
+$node->content['redirect_uri'] = array(
+    '#value' => theme('oauth2_client_redirect_uri', $node->redirect_uri),
+    '#weight' => -8,
+);
+$node->content['base_domain'] = array(
+    '#value' => theme('oauth2_client_base_domain', $node->base_domain),
+    '#weight' => -7,
+);
+
+return $node;
+}*/
+
+/**
+ * Implements hook_theme().
+ */
+/*function oauth2_client_theme() {
+ return array(
+     'oauth2_client_client_id' => array(
+         'arguments' => array('client_id' => '', 'teaser' => 0, 'page' => 0),
+     ),
+     'oauth2_client_client_secret' => array(
+         'arguments' => array('client_secret' => '', 'teaser' => 0, 'page' => 0),
+),
+'oauth2_client_redirect_uri' => array(
+'arguments' => array('redirect_uri' => '', 'teaser' => 0, 'page' => 0),
+),
+'oauth2_client_base_domain' => array(
+'arguments' => array('base_domain' => '', 'teaser' => 0, 'page' => 0),
+),
+);
+}*/
+
+/**
+ * Returns HTML for field client_id.
+ *
+ * @ingroup themeable
+ */
+/*function theme_oauth2_client_client_id($client_id, $teaser = 0, $page = 0) {
+ $output = '<div class="oauth2_client-info client_id">';
+ $output .= t('Application ID: @client_id', array('@client_id' => $client_id));
+ $output .= '</div>';
+ return $output;
+ }*/
+
+/**
+ * Returns HTML for field client_secret.
+ *
+ * @ingroup themeable
+ */
+/*function theme_oauth2_client_client_secret($client_secret, $teaser = 0, $page = 0) {
+ $output = '<div class="oauth2_client-info client_secret">';
+ $output .= t('Application Secret: @client_secret', array('@client_secret' => $client_secret));
+ $output .= '</div>';
+ return $output;
+ }*/
+
+/**
+ * Returns HTML for field redirect_uri.
+ *
+ * @ingroup themeable
+ */
+/*function theme_oauth2_client_redirect_uri($redirect_uri, $teaser = 0, $page = 0) {
+ $output = '<div class="oauth2_client-info redirect_uri">';
+ $output .= t('Site URL: @redirect_uri', array('@redirect_uri' => $redirect_uri));
+ $output .= '</div>';
+ return $output;
+ }*/
+
+/**
+ * Returns HTML for field base_domain.
+ *
+ * @ingroup themeable
+ */
+/*function theme_oauth2_client_base_domain($base_domain, $teaser = 0, $page = 0) {
+ $output = '<div class="oauth2_client-info base_domain">';
+ $output .= t('Site Domain: @base_domain', array('@base_domain' => empty($base_domain) ? t('<none>') : $base_domain));
+ $output .= '</div>';
+ return $output;
+ }
+ */

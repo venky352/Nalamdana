@@ -1,0 +1,63 @@
+<?php
+
+/**
+ * @file
+ * Simpletest case for oauth2_consumer module.
+ *
+ * Verify oauth2_consumer module functionality.
+ */
+
+/**
+ * Functionality tests for oauth2_consumer module.
+ */
+class OAuth2ConsumerTestCase extends DrupalWebTestCase {
+  protected $admin_user;
+
+  public static function getInfo() {
+    return array(
+        'name' => 'OAuth2.0 Consumer Support',
+        'description' => 'Verify the extend fields added to oauth2_server by oauth2_consumer.',
+        'group' => 'OAuth2.0',
+    );
+  }
+
+  function setUp() {
+    // Enable the module.
+    parent::setUp('oauth2_server', 'oauth2_consumer');
+    $this->admin_user = $this->drupalCreateUser(array('administer site configuration', 'administer nodes', 'create oauth2_server', 'access content'));
+  }
+
+  /**
+   * Verify the functionality of the oauth2_consumer module.
+   */
+  function testNodeCreation() {
+    $this->drupalLogin($this->admin_user);
+
+    // Create a new node.
+    $edit = array(
+        'title' => $this->randomName(),
+        'server_id' => $this->randomName(),
+        'base_uri' => 'http://example.com/',
+        'client_id' => md5(base64_encode(pack('N6', mt_rand(), mt_rand(), mt_rand(), mt_rand(), mt_rand(), uniqid()))),
+        'client_secret' => md5(base64_encode(pack('N6', mt_rand(), mt_rand(), mt_rand(), mt_rand(), mt_rand(), uniqid()))),
+        'authorize_uri' => 'oauth2/authorize',
+        'access_token_uri' => 'oauth2/access_token',
+        'username' => 'example_username',
+        'password' => 'example_password',
+        'services_uri' => 'example_endpoint',
+        'expires_in' => '60',
+
+    );
+    $this->drupalPost('node/add/oauth2-server', $edit, t('Save'));
+    $this->assertText(t("OAuth2.0 Server Identifer @title has been created", array('@title' => $edit['title'])));
+    $this->assertText(t('Server ID: @server_id', array('@server_id' => $edit['server_id'])));
+    $this->assertText(t('Base URI: @base_uri', array('@base_uri' => $edit['base_uri'])));
+    $this->assertText(t('Application ID: @client_id', array('@client_id' => $edit['client_id'])));
+    $this->assertText(t('Application Secret: @client_secret', array('@client_secret' => $edit['client_secret'])));
+    $this->assertText(t('End-user authorization endpoint: @authorize_uri', array('@authorize_uri' => $edit['authorize_uri'])));
+    $this->assertText(t('Token endpoint: @access_token_uri', array('@access_token_uri' => $edit['access_token_uri'])));
+    $this->assertText(t('Username: @username', array('@username' => $edit['username'])));
+    $this->assertText(t('Services endpoint: @services_uri', array('@services_uri' => $edit['services_uri'])));
+    $this->assertText(t('Cache lifetime (in seconds): @expires_in', array('@expires_in' => $edit['expires_in'])));
+  }
+}

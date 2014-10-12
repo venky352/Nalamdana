@@ -1,0 +1,20 @@
+<?php
+
+/**
+ * @file
+ *  Provides a OAuth2.0 based validation system.
+ */
+
+/**
+ * Implements hook_services_authentication_info().
+ */
+function services_oauth2_services_authentication_info() {
+  return array(
+    'file' => 'services_oauth2.inc',
+    'title' => t('OAuth2.0 authentication'),
+    'description' => t('An open protocol to allow secure API authorization'),
+    'security_settings' => '_services_oauth2_security_settings',
+    'authenticate_call' => '_services_oauth2_authenticate_call',
+    'controller_settings' => '_services_oauth2_controller_settings',
+  );
+}

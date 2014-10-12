@@ -1,0 +1,570 @@
+<?php
+
+/**
+ * @file
+ * The OAuth2.0 Server Identifer as Drupal entity.
+ */
+
+/**
+ * Implements hook_init().
+ */
+function oauth2_server_init() {
+
+}
+/**
+ * Implements hook_user_logout().
+ */
+function oauth2_server_user_logout() {
+  if (variable_get('oauth2_mode_enable',FALSE) && variable_get('oauth2_provider_mode', OAUTH2_DEFAULT_PROVIDER_MODE) == 'DrupalOAuth2Client' && variable_get('oauth2_client_server_identifier')) {
+    $server_id = variable_get('oauth2_client_server_identifier');
+    $client = oauth2_get_client($server_id);
+
+    //tell the server to expire the session(access token,etc)
+    $client->expireSession();
+
+    //flush the oauth2 session
+    $client->setSession();
+  }
+}
+
+/**
+ * Implements hook_help().
+ */
+function oauth2_server_help($section, $arg) {
+  switch ($section) {
+    case 'admin/structure/oauth2/oauth2-server':
+      $help = '<p>'. t("An <a href='!oauth2_server'>OAuth2.0 Server Identifer</a> contain the target OAuth2.0 provider information, including client_id, client_secret, authorize_uri and access_token_uri, etc.", array(
+      '!oauth2_server' => url('admin/structure/oauth2/oauth2-server/add'),
+      )) .'</p>';
+      return $help;
+  }
+}
+
+/**
+ * Implements hook_menu().
+ */
+function oauth2_server_menu() {
+
+
+  $items = array();
+
+  $items['admin/structure/oauth2/oauth2-server'] = array(
+      'title' => 'Servers',
+      'description' => 'List, add, and edit OAuth2.0 Server Identifer.',
+      'page callback' => 'oauth2_server_admin_callback',
+      'access arguments' => array('administer site configuration'),
+      'file' => 'oauth2_server.admin.inc',
+      'type' => MENU_LOCAL_TASK,
+      'weight' => -10,
+  );
+
+  $items['admin/structure/oauth2/oauth2-server/%oauth2_server'] = array(
+      'title' => 'View OAuth2 Server Identifier',
+      'page callback' => 'oauth2_server_view_callback',
+      'page arguments' => array(4),
+      'access callback' => 'oauth2_server_access',
+      'access arguments' => array('edit',1),
+      'file' => 'oauth2_server.admin.inc',
+      //'type' => MENU_LOCAL_TASK,
+      'weight' => -9,
+  );
+
+  $items['admin/structure/oauth2/oauth2-server/add'] = array(
+      'title' => 'Add OAuth2 Server Identifier',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('oauth2_server_edit_form'),
+      'access callback' => 'oauth2_server_access',
+      'access arguments' => array('create',1),
+      'file' => 'oauth2_server.admin.inc',
+      //'type' => MENU_LOCAL_TASK,
+      'weight' => -8,
+  );
+
+  $items['admin/structure/oauth2/oauth2-server/%oauth2_server/edit'] = array(
+      'title' => 'Edit OAuth2 Server Identifier',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('oauth2_server_edit_form', 4),
+      'access callback' => 'oauth2_server_access',
+      'access arguments' => array('edit',1),
+      'file' => 'oauth2_server.admin.inc',
+      //'type' => MENU_LOCAL_TASK,
+      'weight' => -7,
+  );
+
+  $items['admin/structure/oauth2/oauth2-server/%oauth2_server/delete'] = array(
+      'title' => 'Delete OAuth2 Server Identifier',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('oauth2_server_delete_form', 4),
+      'access callback' => 'oauth2_server_access',
+      'access arguments' => array('delete',1),
+      'file' => 'oauth2_server.admin.inc',
+      //'type' => MENU_LOCAL_TASK,
+      'weight' => -6,
+  );
+
+  return $items;
+}
+
+/**
+ * Implements hook_entity_info().
+ */
+
+function oauth2_server_entity_info() {
+  return array(
+      'oauth2_server' => array(
+          'label' => t('OAuth2.0 Server Identifer'),
+          'base table' => 'oauth2_server',
+          'uri callback' => 'oauth2_server_uri',
+          'fieldable' => FALSE,
+          'entity keys' => array(
+              'id' => 'sid',
+          ),
+          'buddles' => array(
+              'oauth2_server' => array(
+                  'label' => 'OAuth2 Server Identifier',
+                  'admin' => array(
+                      'path' => 'admin/structure/oauth2/oauth2-server',
+                      'access arguments' =>  array('administer site configuration')
+                  )
+              )
+          ),
+          'view modes' => array(
+              'full' => array(
+                  'label' => t('Servers'),
+                  'custom settings' => FALSE,
+              ),
+          ),
+      ),
+  );
+}
+
+/**
+ * Entity uri callback
+ */
+function oauth2_server_uri($server) {
+  return array(
+      'path' => 'admin/structure/oauth2/oauth2-server/' . $server->sid
+  );
+}
+
+
+/**
+ * Implements hook_permission().
+ */
+function oauth2_server_permission() {
+  return array(
+      'create oauth2_server' => array(
+          'title' => t('Create new server')
+      ),
+      /*'delete own oauth2_server' => array(
+       'title' => t('Delete own server')
+      ),*/
+      'delete any oauth2_server' => array(
+          'title' => t('Delete any server')
+      ),
+      /*'edit own oauth2_server' => array(
+       'title' => t('Edit own server')
+      ),*/
+      'edit any oauth2_server' => array(
+          'title' => t('Edit any server')
+      ),
+  );
+}
+
+/**
+ * @param $op
+ *   The operation that is to be performed on the server.
+ * @param $server
+ *   The server object.
+ * @return
+ *   TRUE if the current user has access to the server, FALSE otherwise.
+ */
+function oauth2_server_access($op, $server) {
+  global $user;
+  if ($op == 'create') {
+    // Anonymous users cannot post even if they have the permission.
+    return user_access('create oauth2_server', $user) && $user->uid ? TRUE : NULL;
+  }
+
+  if ($op == 'edit') {
+    if (user_access('edit any oauth2_server', $user)) { // || (user_access('edit own oauth2_server', $user) && ($user->uid == $server->uid))) {
+      return TRUE;
+    }
+  }
+
+  if ($op == 'delete') {
+    if (user_access('delete any oauth2_server', $user)) { // || (user_access('delete own oauth2_server', $user) && ($user->uid == $server->uid))) {
+      return TRUE;
+    }
+  }
+  return false;
+}
+
+/**
+ * Update/Add a record
+ */
+function oauth2_server_update($oauth2_server) {
+
+  if (!isset($oauth2_server['sid'])) {
+
+    drupal_write_record('oauth2_server', $oauth2_server);
+  } else {
+    drupal_write_record('oauth2_server', $oauth2_server, 'sid');
+  }
+  return $oauth2_server['sid'];
+}
+
+/**
+ * Delete a record
+ */
+function oauth2_server_delete($server_id) {
+  db_query("DELETE FROM {oauth2_server} WHERE server_id = :d", array(':d' => $server_id));
+}
+
+/**
+ * Load a record
+ */
+function oauth2_server_load($server_id) {
+
+
+  ctools_include('export');
+  $result = ctools_export_load_object('oauth2_server', 'names', array($server_id));
+
+  if (isset($result[$server_id])) {
+    return $result[$server_id];
+  }
+}
+
+/**
+ * Load multiple
+ */
+function oauth2_server_load_multiple($server_ids = NULL) {
+  ctools_include('export');
+  if ($server_ids === NULL) {
+    $results = ctools_export_load_object('oauth2_server');
+  } else {
+    $results = ctools_export_load_object('oauth2_server', 'names', $server_ids);
+  }
+  return array_filter($results);
+
+  //return entity_load('oauth2_server', $sids, $conditions, $reset);
+}
+
+/**
+ * Implements hook_block_info().
+ */
+function oauth2_server_block_info() {
+  $blocks = array();
+  if (variable_get('oauth2_mode_enable',FALSE) && variable_get('oauth2_provider_mode', OAUTH2_DEFAULT_PROVIDER_MODE) == 'DrupalOAuth2Client' && variable_get('oauth2_client_server_identifier')) {
+    $blocks['oauth2_login'] = array();
+    $blocks['oauth2_login']['info'] = t('OAuth2 Login');
+    $blocks['oauth2_login']['cache'] = DRUPAL_NO_CACHE;
+    $blocks['oauth2_login']['region'] = 'sidebar_first';
+    $blocks['oauth2_login']['status'] = 1;
+
+
+    $blocks['oauth2_my_account'] = array();
+    $blocks['oauth2_my_account']['info'] = t('OAuth2 My Account');
+    $blocks['oauth2_my_account']['cache'] = DRUPAL_NO_CACHE;
+    $blocks['oauth2_my_account']['region'] = 'sidebar_first';
+    $blocks['oauth2_my_account']['status'] = 1;
+    
+    $blocks['oauth2_register'] = array();
+    $blocks['oauth2_register']['info'] = t('OAuth2 Register');
+    $blocks['oauth2_register']['cache'] = DRUPAL_NO_CACHE;
+    $blocks['oauth2_register']['region'] = 'sidebar_first';
+    $blocks['oauth2_register']['status'] = 1;
+  }
+  return $blocks;
+}
+
+function oauth2_server_block_view($delta = '') {
+  global $user;
+
+  $block = array();
+  if (variable_get('oauth2_mode_enable',FALSE) && variable_get('oauth2_provider_mode', OAUTH2_DEFAULT_PROVIDER_MODE) == 'DrupalOAuth2Client' && variable_get('oauth2_client_server_identifier')) {
+    $sid = variable_get('oauth2_client_server_identifier');
+
+    $client = oauth2_get_client($sid);
+
+    $server_entity = oauth2_server_load($sid);
+    switch ($delta) {
+      case 'oauth2_login':
+
+        if (!$user->uid) {
+          $links = array (
+              'link_redirect' => array(
+                  'title' => 'OAuth2 Login (Redirect)',
+                  'href' => $client->getLoginUri(),
+
+                  //'href' => $server->base_uri.$server->authorize_uri.'?response_type=code&client_id='.$server->client_id.'&redirect_uri='.url('<front>',array('absolute' => TRUE)),
+              ),
+          );
+          $block['subject'] = t('OAuth2 login');
+          $block['content'] = array(
+              'link' => array(
+                  '#theme'  => 'links',
+                  '#text'   => 'OAuth2 Login',
+                  '#links'   => $links,
+                  '#options' => array(
+                      'attributes' => array(),
+                      //REQUIRED:
+                      'html' => FALSE,
+                  )
+              ),
+
+          );
+        }
+        return $block;
+      case 'oauth2_register':
+
+        if (!$user->uid) {
+          $links = array (
+              'link_redirect' => array(
+                  'title' => 'OAuth2 Register',
+                  'href' => $server_entity->base_uri.'user/register?client_id='.$server_entity->client_id,
+                  'attributes' => array('target' => '_blank'),
+              ),
+          );
+          $block['subject'] = t('OAuth2 Register');
+          $block['content'] = array(
+              'link' => array(
+                  '#theme'  => 'links',
+                  '#text'   => 'OAuth2 Register',
+                  '#links'   => $links,
+                  '#options' => array(
+                      'attributes' => array(),
+                      //REQUIRED:
+                      'html' => FALSE,
+                  )
+              ),
+
+          );
+        }
+        return $block;
+      case 'oauth2_my_account' :
+        if ($user->uid) {
+          $links = array (
+              'link_redirect' => array(
+                  'title' => 'OAuth2 My Account',
+                  'href' => $server_entity->base_uri.'user',
+                  'attributes' => array('target' => '_blank'),
+              ),
+          );
+          $block['subject'] = t('OAuth2 My Account');
+          $block['content'] = array(
+              'link' => array(
+                  '#theme'  => 'links',
+                  '#text'   => 'OAuth2 My Account',
+                  '#links'   => $links,
+                  '#options' => array(
+
+                      //REQUIRED:
+                      'html' => FALSE,
+                  )
+              ),
+
+          );
+        }
+        return $block;
+    }
+  }
+
+}
+
+/**
+ * Implementation of hook_ctools_plugin_api().
+ *
+ * Tell CTools that we support the default_mymodule_presets API.
+ */
+function oauth2_server_ctools_plugin_api($owner, $api) {
+  if ($owner == 'auth2_server' && $api == 'default_auth2_server_presets') {
+    return array('version' => 1);
+  }
+}
+
+/**
+ * Implementation of hook_default_mymodule_preset().
+ *
+ * Provide a couple of default presets.
+ */
+function oauth2_server_default_mymodule_preset() {
+  $export = array();
+
+  $preset = new stdClass;
+  $preset->api_version = 1;
+  $preset->server_id = 'default_server_machine_name';
+  $preset->title = 'Default title';
+  //$preset->mydata = 'x';
+  $export['my_default_preset'] = $preset;
+
+  return $export;
+}
+
+/**
+ * 
+ */
+function oauth2_server_form_user_profile_form_alter(&$form, &$form_state, $form_id) {
+  if (variable_get('oauth2_mode_enable',FALSE) == FALSE || variable_get('oauth2_provider_mode', OAUTH2_DEFAULT_PROVIDER_MODE) != 'DrupalOAuth2Client' || variable_get('oauth2_client_server_identifier', NULL) == NULL || !isset($_SESSION['oauth2_temp_user_profile'])) {
+    return;
+  }
+  $server_id = variable_get('oauth2_client_server_identifier');
+  $server_entity = oauth2_server_load($server_id);
+  global $user;
+  $account = $form_state['user'];
+  if ($user->uid == 1 || $account->uid != $user->uid) {
+    return; //allow user 1 to edit it locally, allow users (with permission) edit other user's form locally 
+  }
+  /*$form['abcc'] = array(
+    '#type' => 'textfield',
+    '#title' => t('omg'),
+    '#description' => t('abccc'),
+    '#weight' => -100,
+  );*/
+  $items = array();
+  $items[] = l(t('Edit Password/E-mail and other profile fields'), $server_entity->base_uri.'user/'.$_SESSION['oauth2_temp_user_profile']['uid'].'/edit', 
+    array('attributes' => 
+        array('title' => t('Edit password/E-mail.'),
+               'target' => '_blank',
+            )));
+  $form['links'] = array('#markup' => theme('item_list', array('items' => $items)));
+
+  $form['account']['name']['#type'] = 'hidden';
+  $form['account']['pass']['#type'] = 'hidden';
+  $form['account']['mail']['#type'] = 'hidden';
+  $form['account']['current_pass']['#type'] = 'hidden';
+  
+  
+  
+  $items2 = array();
+  foreach ($_SESSION['oauth2_temp_user_profile'] as $id => $field_in_master) {
+    if (strpos($id,'field') !== 0) {  //only show custom field (field id starts with 'field'
+      continue;
+    }
+    
+    if (strpos($id,'first_name') === FALSE && strpos($id,'last_name') === FALSE) {
+      continue;
+    }
+    
+    $items2[$id] = $id.' :';
+    if (empty($field_in_master)) {
+      continue;
+    }
+    
+    $i = 0;
+    $temp = reset($field_in_master);
+    //error_log(print_r($temp,true));
+    foreach ($temp as $temp_field_inner) {
+      $value = reset($temp_field_inner);
+      if ($i != 0) {
+        $items2[$id] .= ',';
+      }
+      $items2[$id] .= $value;
+      $i++;
+    }
+  }
+  
+  $form['fields_in_master'] = array('#markup' => theme('item_list', array('items' => $items2)));
+  //*/
+
+  return $form;
+}
+
+
+/**
+ * Implements hook_theme().
+ */
+/*function oauth2_server_theme() {
+ return array(
+     'oauth2_server_server_id' => array(
+         'arguments' => array('server_id' => '', 'teaser' => 0, 'page' => 0),
+     ),
+     'oauth2_server_base_uri' => array(
+         'arguments' => array('base_uri' => '', 'teaser' => 0, 'page' => 0),
+     ),
+     'oauth2_server_client_id' => array(
+         'arguments' => array('client_id' => '', 'teaser' => 0, 'page' => 0),
+     ),
+     'oauth2_server_client_secret' => array(
+         'arguments' => array('client_secret' => '', 'teaser' => 0, 'page' => 0),
+     ),
+     'oauth2_server_authorize_uri' => array(
+         'arguments' => array('authorize_uri' => '', 'teaser' => 0, 'page' => 0),
+     ),
+     'oauth2_server_access_token_uri' => array(
+         'arguments' => array('access_token_uri' => '', 'teaser' => 0, 'page' => 0),
+     ),
+ );
+}*/
+
+/**
+ * Returns HTML for field server_id.
+ *
+ * @ingroup themeable
+ */
+/*function theme_oauth2_server_server_id($server_id, $teaser = 0, $page = 0) {
+ $output = '<div class="oauth2_server-info server_id">';
+ $output .= t('Server ID: @server_id', array('@server_id' => $server_id));
+ $output .= '</div>';
+ return $output;
+ }*/
+
+/**
+ * Returns HTML for field base_uri.
+ *
+ * @ingroup themeable
+ */
+/*function theme_oauth2_server_base_uri($base_uri, $teaser = 0, $page = 0) {
+ $output = '<div class="oauth2_server-info base_uri">';
+ $output .= t('Base URI: @base_uri', array('@base_uri' => $base_uri));
+ $output .= '</div>';
+ return $output;
+ }*/
+
+/**
+ * Returns HTML for field client_id.
+ *
+ * @ingroup themeable
+ */
+/*function theme_oauth2_server_client_id($client_id, $teaser = 0, $page = 0) {
+ $output = '<div class="oauth2_server-info client_id">';
+ $output .= t('Application ID: @client_id', array('@client_id' => $client_id));
+ $output .= '</div>';
+ return $output;
+ }*/
+
+/**
+ * Returns HTML for field client_secret.
+ *
+ * @ingroup themeable
+ */
+/*function theme_oauth2_server_client_secret($client_secret, $teaser = 0, $page = 0) {
+ $output = '<div class="oauth2_server-info client_secret">';
+ $output .= t('Application Secret: @client_secret', array('@client_secret' => $client_secret));
+ $output .= '</div>';
+ return $output;
+ }*/
+
+/**
+ * Returns HTML for field authorize_uri.
+ *
+ * @ingroup themeable
+ */
+/*function theme_oauth2_server_authorize_uri($authorize_uri, $teaser = 0, $page = 0) {
+ $output = '<div class="oauth2_server-info authorize_uri">';
+ $output .= t('End-user authorization endpoint: @authorize_uri', array('@authorize_uri' => $authorize_uri));
+ $output .= '</div>';
+ return $output;
+ }*/
+
+/**
+ * Returns HTML for field access_token_uri.
+ *
+ * @ingroup themeable
+ */
+/*function theme_oauth2_server_access_token_uri($access_token_uri, $teaser = 0, $page = 0) {
+ $output = '<div class="oauth2_server-info access_token_uri">';
+ $output .= t('Token endpoint: @access_token_uri', array('@access_token_uri' => $access_token_uri));
+ $output .= '</div>';
+ return $output;
+ }*/

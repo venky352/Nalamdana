@@ -1,0 +1,15 @@
+name = "OAuth2.0 Provider Support"
+description = "Provides functionality for OAuth2.0 when acting as a provider."
+package = "OAuth2.0"
+dependencies[] = oauth2
+core = 7.x
+
+files[] = oauth2_provider.pages.inc
+
+files[] = oauth2_provider.test
+; Information added by drupal.org packaging script on 2013-10-01
+version = "7.x-1.0-alpha1+5-dev"
+core = "7.x"
+project = "oauth2"
+datestamp = "1380595030"
+

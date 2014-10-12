@@ -1,0 +1,107 @@
+<?php
+
+/**
+ * @file
+ * OAuth2.0 Server Identifer schema
+ */
+
+function oauth2_server_uninstall() {
+  variable_del('oauth2_client_server_identifier');
+}
+
+/**
+ * Implements hook_schema().
+ */
+function oauth2_server_schema() {
+  $schema = array();
+  $schema['oauth2_server'] = array(
+      'description' => 'OAuth2.0 server indentifier information as a Drupal Entity.',
+      'export' => array(
+          'key' => 'server_id',
+          'key name' => 'OAuth2.0 Server Machine Name',
+          'primary key' => 'sid',
+          'identifier' => 'preset', // Exports will be defined as $preset
+          'default hook' => 'default_oauth2_server_preset',  // Function hook name.
+          'api' => array(
+              'owner' => 'oauth2_server',
+              'api' => 'default_oauth2_server_presets',  // Base name for api include files.
+              'minimum_version' => 1,
+              'current_version' => 1,
+          ),
+      ),
+      'fields' => array(
+          'sid' => array(
+              'description' => 'Primary Key: Unique server ID',
+              'type' => 'serial',
+              'unsigned' => TRUE,
+              'not null' => TRUE,
+              'no export' => TRUE,
+          ),
+          'server_id' => array(
+              'description' => t('The server machine name.'),
+              'type' => 'varchar',
+              'length' => 64,
+              'not null' => TRUE,
+          ),
+          'title' => array(
+              'description' => t('title.'),
+              'type' => 'varchar',
+              'length' => 64,
+              'not null' => TRUE,
+          ),
+          'client_id' => array(
+              'description' => t('Your registered client identifier.'),
+              'type' => 'varchar',
+              'length' => 64,
+              'not null' => TRUE,
+          ),
+          'client_secret' => array(
+              'description' => t('Your registered client password.'),
+              'type' => 'varchar',
+              'length' => 255,
+              'not null' => TRUE,
+          ),
+          'base_uri' => array(
+              'description' => t('The authorization server\'s HTTP base URI, typically to the front page.'),
+              'type' => 'text',
+          ),
+          'services_uri' => array(
+              'description' => t('The remote server\'s HTTP endpoint capable of Drupal Service 3.x services. Absolute path or path relative to base URI.'),
+              'type' => 'text',
+          ),
+          'authorize_uri' => array(
+              'description' => t('The authorization server\'s HTTP endpoint capable of authenticating the end-user and obtaining authorization. Absolute path or path relative to base URI.'),
+              'type' => 'text',
+          ),
+          'access_token_uri' => array(
+              'description' => t('The authorization server\'s HTTP endpoint capable of issuing tokens and refreshing expired tokens. Absolute path or path relative to base URI.'),
+              'type' => 'text',
+          ),
+          'status' => array(
+              'type' => 'int',
+              'unsigned' => TRUE,
+              'not null' => TRUE,
+              'default' => 1,
+              'size' => 'tiny',
+              'description' => 'status',
+          ),
+          'changed' => array(
+              'type' => 'int',
+              'unsigned' => TRUE,
+              'not null' => TRUE,
+              'default' => 1,
+              'size' => 'tiny',
+              'description' => 'changed',
+          ),
+      ),
+      'indexes' => array(
+          'oauth2_server_status' => array('status'),
+      ),
+      'primary key' => array('sid'),
+      'unique keys' => array(
+          'server_id' => array('server_id'),
+      ),
+  );
+
+  return $schema;
+}

@@ -1,0 +1,17 @@
+name = "OAuth2.0 Server Identifer"
+description = "Handle OAuth2.0 Server Identifer as Drupal node."
+package = "OAuth2.0"
+dependencies[] = oauth2
+core = 7.x
+
+files[] = oauth2_server.admin.inc
+
+files[] = oauth2_server.test
+
+scripts[] = oauth2_server.js
+; Information added by drupal.org packaging script on 2013-10-01
+version = "7.x-1.0-alpha1+5-dev"
+core = "7.x"
+project = "oauth2"
+datestamp = "1380595030"
+
