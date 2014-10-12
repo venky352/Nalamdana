@@ -9,7 +9,7 @@ teenagers in the age group of 14-18.
 - Teenagers in this age group are going through several **physical and mental changes** and that makes them particularly **vulnerable** to external influences. Some of them get exposed to **alcohol or drugs**, some face **child abuse** and other evils. 
 - Hence, Nalamdana tries to educate them about hygiene, sex education, safety, recognizing their potential and setting future goals.   
 
-With this vision, they have already tried distributing smalls handbooks about these topics in schools, but have been refused by school administration citing reasons such as sexual content. An online platform will enable them to overcome these restrictions. A fun and interactive platform would make the learning process interactive, and help in gaining popularity.
+With this vision, they have already tried distributing smalls handbooks about these topics in schools, but have been **refused by school authorities** citing reasons such as sexual content. An online platform will enable them to overcome these restrictions. A fun and interactive platform would make the learning process interactive, and help in gaining popularity, thereby making **necessary education accessible** as well.
 
 3. Innovation
 -------------
